@@ -1,0 +1,24 @@
+/* Only the bits Tailwind utilities can't easily cover:
+   the mirrored camera + overlay, and the JS-toggled status pill states. */
+
+.camera-stage { position: relative; width: 100%; }
+#video, #overlay { width: 100%; display: block; border-radius: 14px; }
+#video  { transform: scaleX(-1); background: #000; aspect-ratio: 4 / 3; object-fit: cover; }
+#overlay { position: absolute; inset: 0; transform: scaleX(-1); pointer-events: none; }
+
+/* Status pill — class is set dynamically by measure.js */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: .9rem;
+  transition: all .2s ease;
+}
+.status-pill::before {
+  content: ""; width: 9px; height: 9px; border-radius: 999px; background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 25%, transparent);
+}
+.status-pill.red   { background: rgba(239,68,68,.12);  color: #fca5a5; border: 1px solid rgba(239,68,68,.4); }
+.status-pill.green { background: rgba(34,197,94,.12);  color: #86efac; border: 1px solid rgba(34,197,94,.45); }
+
+/* subtle pulse when waiting */
+.status-pill.red::before { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }

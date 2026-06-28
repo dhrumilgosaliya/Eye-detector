@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Eye Detector{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            ink:    { 900:'#0b1120', 800:'#0f172a', 700:'#1e293b', 600:'#273449' },
+            line:   '#334155',
+            brand:  { DEFAULT:'#38bdf8', 600:'#0ea5e9', 700:'#0284c7' },
+          },
+          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] },
+          boxShadow: { card: '0 10px 30px -12px rgba(0,0,0,.6)' },
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="min-h-screen bg-ink-900 text-slate-200 font-sans antialiased
+             bg-[radial-gradient(1000px_500px_at_80%_-10%,rgba(56,189,248,.12),transparent),radial-gradient(800px_400px_at_-10%_10%,rgba(99,102,241,.10),transparent)]">
+
+{% if current_user %}
+<nav class="sticky top-0 z-30 backdrop-blur bg-ink-800/80 border-b border-line/70">
+  <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+    <a href="{{ url_for('dashboard') }}" class="flex items-center gap-2 font-extrabold text-lg text-white">
+      <span class="grid place-items-center w-9 h-9 rounded-xl bg-brand/15 text-brand text-xl">👁</span>
+      Eye&nbsp;Detector
+    </a>
+    <button id="navToggle" class="sm:hidden p-2 rounded-lg hover:bg-ink-700" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div id="navLinks" class="hidden sm:flex items-center gap-1 text-sm">
+      {% set link='px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-ink-700 transition' %}
+      <a class="{{ link }}" href="{{ url_for('dashboard') }}">Measure</a>
+      <a class="{{ link }}" href="{{ url_for('history') }}">History</a>
+      <a class="{{ link }}" href="{{ url_for('profile') }}">My Profile</a>
+      {% if current_user.is_admin %}<a class="{{ link }}" href="{{ url_for('admin') }}">Admin</a>{% endif %}
+      <a class="px-3 py-2 ml-1 rounded-lg text-rose-300 hover:text-white hover:bg-rose-500/20 transition" href="{{ url_for('logout') }}">Sign out</a>
+    </div>
+  </div>
+  <div id="navMobile" class="sm:hidden hidden border-t border-line/70 px-5 py-2 flex flex-col text-sm bg-ink-800">
+    <a class="py-2 text-slate-300" href="{{ url_for('dashboard') }}">Measure</a>
+    <a class="py-2 text-slate-300" href="{{ url_for('history') }}">History</a>
+    <a class="py-2 text-slate-300" href="{{ url_for('profile') }}">My Profile</a>
+    {% if current_user.is_admin %}<a class="py-2 text-slate-300" href="{{ url_for('admin') }}">Admin</a>{% endif %}
+    <a class="py-2 text-rose-300" href="{{ url_for('logout') }}">Sign out</a>
+  </div>
+</nav>
+{% endif %}
+
+<main class="max-w-6xl mx-auto px-5 py-8">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, msg in messages %}
+        <div class="mb-4 rounded-xl px-4 py-3 text-sm border
+          {% if category=='error' %}bg-rose-500/10 border-rose-500/40 text-rose-200
+          {% else %}bg-emerald-500/10 border-emerald-500/40 text-emerald-200{% endif %}">
+          {{ msg }}
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+
+<script>
+  const t=document.getElementById('navToggle');
+  if(t){t.addEventListener('click',()=>document.getElementById('navMobile').classList.toggle('hidden'));}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

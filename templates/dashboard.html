@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Measure · Eye Detector{% endblock %}
+{% block content %}
+
+<div class="flex items-end justify-between flex-wrap gap-3 mb-6">
+  <div>
+    <h1 class="text-2xl font-extrabold text-white">Eye measurement</h1>
+    <p class="text-slate-400 text-sm mt-1">
+      Position your face in the frame. The box turns
+      <span class="text-emerald-400 font-semibold">green</span> when you're steady and
+      at a good distance — then lock and submit.
+    </p>
+  </div>
+  <button id="startBtn"
+          class="rounded-xl bg-brand hover:bg-brand-600 text-ink-900 font-semibold px-5 py-2.5 transition">
+    Start camera
+  </button>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-6">
+  <!-- Camera -->
+  <div class="lg:col-span-3 rounded-2xl border border-line/70 bg-ink-800/70 backdrop-blur p-4 shadow-card">
+    <div class="camera-stage">
+      <video id="video" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+      <div class="absolute inset-0 grid place-items-center pointer-events-none" id="camPlaceholder">
+        <div class="text-center text-slate-400">
+          <div class="text-4xl mb-2">📷</div>
+          <p class="text-sm">Press <span class="text-white font-medium">Start camera</span> to begin</p>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center justify-between flex-wrap gap-3 mt-4">
+      <div id="status" class="status-pill red">Camera off</div>
+      <div class="text-sm text-slate-400">
+        Est. camera distance: <span id="distVal" class="text-white font-semibold">–</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls + metrics -->
+  <div class="lg:col-span-2 space-y-6">
+    <div class="rounded-2xl border border-line/70 bg-ink-800/70 backdrop-blur p-5 shadow-card">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-bold text-white">Live readings</h2>
+        <span id="lockedTag" class="text-xs text-emerald-400 font-semibold"></span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        {% set card='rounded-xl bg-ink-600/70 border border-line/60 p-3' %}
+        {% set val='text-xl font-bold text-brand' %}
+        {% set lbl='text-[11px] uppercase tracking-wide text-slate-400 mt-0.5' %}
+        <div class="{{ card }} col-span-2">
+          <div id="m_ipd" class="{{ val }}">–</div><div class="{{ lbl }}">Distance between eyes (IPD)</div>
+        </div>
+        <div class="{{ card }}"><div id="m_lir" class="{{ val }}">–</div><div class="{{ lbl }}">Left iris ⌀</div></div>
+        <div class="{{ card }}"><div id="m_rir" class="{{ val }}">–</div><div class="{{ lbl }}">Right iris ⌀</div></div>
+        <div class="{{ card }}"><div id="m_lrad" class="{{ val }}">–</div><div class="{{ lbl }}">Left iris radius</div></div>
+        <div class="{{ card }}"><div id="m_rrad" class="{{ val }}">–</div><div class="{{ lbl }}">Right iris radius</div></div>
+        <div class="{{ card }}"><div id="m_lpup" class="{{ val }}">–</div><div class="{{ lbl }}">Left pupil (approx)</div></div>
+        <div class="{{ card }}"><div id="m_rpup" class="{{ val }}">–</div><div class="{{ lbl }}">Right pupil (approx)</div></div>
+      </div>
+
+      <div class="flex gap-2 mt-5">
+        <button id="lockBtn" disabled
+                class="flex-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-semibold py-2.5 transition disabled:opacity-40 disabled:cursor-not-allowed">
+          🔒 Lock
+        </button>
+        <button id="submitBtn" disabled
+                class="flex-1 rounded-xl bg-brand hover:bg-brand-600 text-ink-900 font-semibold py-2.5 transition disabled:opacity-40 disabled:cursor-not-allowed">
+          Submit &amp; save
+        </button>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-line/60 bg-ink-800/40 p-4 text-xs text-slate-400 leading-relaxed">
+      Scale comes from the standard average iris diameter (11.7&nbsp;mm). The
+      <span class="text-slate-300 font-medium">iris radius</span> is the visible eye radius a camera
+      can measure — the retina is inside the eyeball and needs medical imaging (OCT/fundus).
+      Pupil size is an approximate brightness-based estimate.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/measure.js') }}"></script>
+{% endblock %}

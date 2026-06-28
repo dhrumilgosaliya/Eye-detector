@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}History · Eye Detector{% endblock %}
+{% block content %}
+<div class="flex items-end justify-between flex-wrap gap-3 mb-6">
+  <div>
+    <h1 class="text-2xl font-extrabold text-white">Measurement history</h1>
+    <p class="text-slate-400 text-sm mt-1">{{ records|length }} saved record(s). All values in millimetres.</p>
+  </div>
+  <a href="{{ url_for('dashboard') }}" class="rounded-xl bg-brand hover:bg-brand-600 text-ink-900 font-semibold px-5 py-2.5 transition">
+    + New measurement
+  </a>
+</div>
+
+{% if records %}
+<div class="rounded-2xl border border-line/70 bg-ink-800/70 backdrop-blur shadow-card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-ink-700/60 text-slate-400">
+        <tr class="text-left">
+          {% set th='px-4 py-3 font-semibold whitespace-nowrap' %}
+          <th class="{{ th }}">Date</th><th class="{{ th }}">IPD</th>
+          <th class="{{ th }}">L iris</th><th class="{{ th }}">R iris</th>
+          <th class="{{ th }}">L rad</th><th class="{{ th }}">R rad</th>
+          <th class="{{ th }}">L pupil</th><th class="{{ th }}">R pupil</th>
+          <th class="{{ th }}">Dist (cm)</th><th class="{{ th }}"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-line/50">
+        {% for r in records %}
+        {% set td='px-4 py-3 whitespace-nowrap' %}
+        <tr class="hover:bg-ink-700/40 transition">
+          <td class="{{ td }} text-slate-300">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="{{ td }} text-white font-semibold">{{ '%.2f'|format(r.interpupillary_distance or 0) }}</td>
+          <td class="{{ td }}">{{ '%.2f'|format(r.left_iris_diameter or 0) }}</td>
+          <td class="{{ td }}">{{ '%.2f'|format(r.right_iris_diameter or 0) }}</td>
+          <td class="{{ td }}">{{ '%.2f'|format(r.left_eye_radius or 0) }}</td>
+          <td class="{{ td }}">{{ '%.2f'|format(r.right_eye_radius or 0) }}</td>
+          <td class="{{ td }}">{{ '%.2f'|format(r.left_pupil_diameter or 0) }}</td>
+          <td class="{{ td }}">{{ '%.2f'|format(r.right_pupil_diameter or 0) }}</td>
+          <td class="{{ td }}">{{ '%.1f'|format(r.estimated_distance_cm or 0) }}</td>
+          <td class="{{ td }}">
+            <form method="post" action="{{ url_for('delete_measurement', mid=r.id) }}"
+                  onsubmit="return confirm('Delete this record?');">
+              <button type="submit" class="text-rose-300 hover:text-rose-200 text-xs font-medium">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="rounded-2xl border border-line/70 bg-ink-800/70 p-10 text-center">
+  <div class="text-4xl mb-3">📏</div>
+  <p class="text-slate-300 font-medium">No measurements yet</p>
+  <p class="text-slate-400 text-sm mt-1">
+    <a href="{{ url_for('dashboard') }}" class="text-brand hover:underline">Take your first measurement →</a>
+  </p>
+</div>
+{% endif %}
+{% endblock %}

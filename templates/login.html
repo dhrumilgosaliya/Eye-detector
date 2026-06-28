@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Sign in · Eye Detector{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] grid place-items-center">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-6">
+      <div class="inline-grid place-items-center w-14 h-14 rounded-2xl bg-brand/15 text-brand text-3xl mb-3">👁</div>
+      <h1 class="text-2xl font-extrabold text-white">Welcome back</h1>
+      <p class="text-slate-400 text-sm mt-1">Sign in to measure and track your eye metrics.</p>
+    </div>
+
+    <div class="rounded-2xl border border-line/70 bg-ink-800/70 backdrop-blur p-6 shadow-card">
+      <form method="post" class="space-y-4">
+        <div>
+          <label for="email" class="block text-sm text-slate-400 mb-1.5">Email</label>
+          <input type="email" id="email" name="email" required autofocus
+                 class="w-full rounded-xl bg-ink-600 border border-line px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/60">
+        </div>
+        <div>
+          <label for="password" class="block text-sm text-slate-400 mb-1.5">Password</label>
+          <input type="password" id="password" name="password" required
+                 class="w-full rounded-xl bg-ink-600 border border-line px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/60">
+        </div>
+        <button type="submit"
+                class="w-full rounded-xl bg-brand hover:bg-brand-600 text-ink-900 font-semibold py-3 transition">
+          Sign in
+        </button>
+      </form>
+      <p class="text-center text-sm text-slate-400 mt-5">
+        No account? <a href="{{ url_for('signup') }}" class="text-brand font-medium hover:underline">Create profile</a>
+      </p>
+    </div>
+
+    <div class="mt-4 rounded-xl border border-line/60 bg-ink-800/40 px-4 py-3 text-xs text-slate-400">
+      <span class="font-semibold text-slate-300">Try it:</span>
+      Demo — demo@eyedetector.app / demo123 · Admin — admin@eyedetector.app / admin123
+    </div>
+  </div>
+</div>
+{% endblock %}

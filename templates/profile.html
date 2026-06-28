@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}My Profile · Eye Detector{% endblock %}
+{% block content %}
+<div class="max-w-xl">
+  <h1 class="text-2xl font-extrabold text-white mb-1">My profile</h1>
+  <p class="text-slate-400 text-sm mb-6">Update your basic information. Leave password blank to keep it unchanged.</p>
+
+  <div class="rounded-2xl border border-line/70 bg-ink-800/70 backdrop-blur p-6 shadow-card">
+    {% set inp='w-full rounded-xl bg-ink-600 border border-line px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/60' %}
+    {% set lbl='block text-sm text-slate-400 mb-1.5' %}
+    <form method="post" class="space-y-4">
+      <div>
+        <label for="name" class="{{ lbl }}">Full name</label>
+        <input type="text" id="name" name="name" value="{{ user.name }}" required class="{{ inp }}">
+      </div>
+      <div>
+        <label for="dob" class="{{ lbl }}">Date of birth</label>
+        <input type="date" id="dob" name="dob" value="{{ user.dob }}" class="{{ inp }}">
+      </div>
+      <div>
+        <label for="email" class="{{ lbl }}">Email</label>
+        <input type="email" id="email" name="email" value="{{ user.email }}" required class="{{ inp }}">
+      </div>
+      <div>
+        <label for="password" class="{{ lbl }}">New password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" class="{{ inp }}">
+      </div>
+      <button type="submit" class="rounded-xl bg-brand hover:bg-brand-600 text-ink-900 font-semibold px-5 py-2.5 transition">
+        Save changes
+      </button>
+    </form>
+  </div>
+
+  <p class="text-slate-500 text-xs mt-4">
+    Account created {{ user.created_at.strftime('%Y-%m-%d') }}
+    {% if user.is_admin %}· <span class="text-brand font-semibold">Admin</span>{% endif %}
+  </p>
+</div>
+{% endblock %}
