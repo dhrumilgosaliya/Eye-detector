@@ -264,35 +264,29 @@ def admin():
 # DB init + seed
 # --------------------------------------------------------------------------- #
 def seed():
-    """Create tables and seed an admin + sample data if empty."""
+    """Create tables and ensure a single admin account exists.
+
+    The admin login is configured via env vars so nothing is hard-coded or
+    exposed publicly:
+        ADMIN_EMAIL      (default: admin@eyedetector.app)
+        ADMIN_PASSWORD   (default: change-me-admin)
+    Every other user signs up themselves. There is no demo/sample account.
+    """
     db.create_all()
-    if User.query.first():
-        return
 
-    admin_user = User(name="Site Admin", email="admin@eyedetector.app",
-                      dob="1990-01-01", is_admin=True)
-    admin_user.set_password("admin123")
-    db.session.add(admin_user)
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@eyedetector.app").strip().lower()
+    admin_pw = os.environ.get("ADMIN_PASSWORD", "change-me-admin")
 
-    demo = User(name="Demo User", email="demo@eyedetector.app", dob="2000-05-15")
-    demo.set_password("demo123")
-    db.session.add(demo)
-    db.session.commit()
-
-    # a couple of sample measurements for the demo user
-    samples = [
-        dict(left_iris_diameter=11.7, right_iris_diameter=11.6,
-             left_pupil_diameter=3.4, right_pupil_diameter=3.5,
-             left_eye_radius=5.85, right_eye_radius=5.8,
-             interpupillary_distance=63.2, estimated_distance_cm=42.0),
-        dict(left_iris_diameter=11.8, right_iris_diameter=11.7,
-             left_pupil_diameter=3.1, right_pupil_diameter=3.2,
-             left_eye_radius=5.9, right_eye_radius=5.85,
-             interpupillary_distance=63.0, estimated_distance_cm=38.5),
-    ]
-    for s in samples:
-        db.session.add(Measurement(user_id=demo.id, **s))
-    db.session.commit()
+    admin_user = User.query.filter_by(email=admin_email).first()
+    if admin_user is None:
+        admin_user = User(name="Site Admin", email=admin_email,
+                          dob="", is_admin=True)
+        admin_user.set_password(admin_pw)
+        db.session.add(admin_user)
+        db.session.commit()
+    elif not admin_user.is_admin:
+        admin_user.is_admin = True
+        db.session.commit()
 
 
 with app.app_context():

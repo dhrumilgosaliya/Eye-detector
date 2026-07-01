@@ -73,11 +73,43 @@
       </div>
     </div>
 
+    <!-- Pupil light-response -->
+    <div class="rounded-2xl border border-line/70 bg-ink-800/70 backdrop-blur p-5 shadow-card">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-bold text-white">Pupil light-response</h2>
+        <span class="text-[11px] text-slate-400">bright → constricts · dark → dilates</span>
+      </div>
+
+      <div class="mb-3">
+        <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+          <span>Ambient light</span><span id="ambVal" class="text-white font-semibold">–</span>
+        </div>
+        <div class="h-2 rounded-full bg-ink-600 overflow-hidden">
+          <div id="ambBar" class="h-full bg-gradient-to-r from-slate-500 to-amber-300 transition-all" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 text-center">
+        {% set c='rounded-xl bg-ink-600/70 border border-line/60 p-2' %}
+        <div class="{{ c }}"><div id="pupNow"  class="text-lg font-bold text-brand">–</div><div class="text-[10px] uppercase tracking-wide text-slate-400">Pupil now</div></div>
+        <div class="{{ c }}"><div id="pupBase" class="text-lg font-bold text-slate-200">–</div><div class="text-[10px] uppercase tracking-wide text-slate-400">Baseline</div></div>
+        <div class="{{ c }}"><div id="pupDelta" class="text-lg font-bold text-slate-200">–</div><div class="text-[10px] uppercase tracking-wide text-slate-400">Change</div></div>
+      </div>
+
+      <canvas id="lightChart" height="90" class="w-full mt-3 rounded-lg bg-ink-900/60"></canvas>
+      <div class="flex gap-4 mt-2 text-[11px] text-slate-400">
+        <span class="flex items-center gap-1"><i class="inline-block w-3 h-0.5 bg-brand"></i>Pupil (mm)</span>
+        <span class="flex items-center gap-1"><i class="inline-block w-3 h-0.5 bg-amber-300"></i>Ambient light</span>
+        <button id="resetBase" class="ml-auto text-brand hover:underline">Reset baseline</button>
+      </div>
+    </div>
+
     <div class="rounded-2xl border border-line/60 bg-ink-800/40 p-4 text-xs text-slate-400 leading-relaxed">
       Scale comes from the standard average iris diameter (11.7&nbsp;mm). The
       <span class="text-slate-300 font-medium">iris radius</span> is the visible eye radius a camera
       can measure — the retina is inside the eyeball and needs medical imaging (OCT/fundus).
-      Pupil size is an approximate brightness-based estimate.
+      Pupil size is an approximate brightness-based estimate, so the light-response
+      trend is indicative rather than clinical.
     </div>
   </div>
 </div>

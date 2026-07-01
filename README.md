@@ -30,15 +30,19 @@ eyes**. Real-world millimetres are derived from the medically-standard average
 - **History** page lists all your saved records (with delete)
 - **My Profile** page to update name / DOB / email / password
 - **Admin** panel: see every user and all their measurements
-- Seeded accounts + sample data on first run
+- **Pupil light-response**: live pupil size vs ambient brightness (pupillary reflex)
 
-## Seeded logins (created automatically on first run)
-| Role  | Email                    | Password |
-|-------|--------------------------|----------|
-| Admin | admin@eyedetector.app    | admin123 |
-| Demo  | demo@eyedetector.app     | demo123  |
+## The admin account
+Every normal user signs up themselves — there is **no demo account**. A single
+admin account is created automatically on first run, configured via env vars:
 
-> Change these before going live (see Security below).
+| Env var          | Default                 |
+|------------------|-------------------------|
+| `ADMIN_EMAIL`    | admin@eyedetector.app   |
+| `ADMIN_PASSWORD` | change-me-admin         |
+
+Set these in Render → Environment (or your shell locally) to your own values.
+The admin login is **not** shown anywhere in the UI.
 
 ## Run locally
 ```bash

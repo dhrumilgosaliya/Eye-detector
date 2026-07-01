@@ -27,11 +27,97 @@ const lockedTag = document.getElementById("lockedTag");
 const off = document.createElement("canvas");
 const offctx = off.getContext("2d", { willReadFrequently: true });
 
+// tiny canvas for cheap whole-frame brightness (ambient light) measurement
+const bright = document.createElement("canvas");
+bright.width = 32; bright.height = 24;
+const brightctx = bright.getContext("2d", { willReadFrequently: true });
+
+// --- light-response state ---
+const ambVal   = document.getElementById("ambVal");
+const ambBar   = document.getElementById("ambBar");
+const pupNowEl = document.getElementById("pupNow");
+const pupBaseEl= document.getElementById("pupBase");
+const pupDelEl = document.getElementById("pupDelta");
+const chart    = document.getElementById("lightChart");
+const cctx     = chart ? chart.getContext("2d") : null;
+const resetBaseBtn = document.getElementById("resetBase");
+
+let pupilBaseline = null;          // mm, set on first good reading
+const seriesPupil = [];            // recent pupil mm
+const seriesLight = [];            // recent ambient light 0..1
+const SERIES_MAX = 160;
+
 let ipdHistory = [];
 let steadyCount = 0;
 let locked = false;
 let lastMetrics = null;   // metrics currently shown
 let frozenMetrics = null; // metrics captured at lock time
+
+// average frame luminance -> 0..1 (Rec.601 luma)
+function ambientLight(image, w, h) {
+  brightctx.drawImage(image, 0, 0, bright.width, bright.height);
+  const d = brightctx.getImageData(0, 0, bright.width, bright.height).data;
+  let sum = 0, n = d.length / 4;
+  for (let i = 0; i < d.length; i += 4) {
+    sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  }
+  return (sum / n) / 255;
+}
+
+function drawLightChart() {
+  if (!cctx) return;
+  const W = chart.width = chart.clientWidth || 300;
+  const H = chart.height;
+  cctx.clearRect(0, 0, W, H);
+  if (seriesPupil.length < 2) return;
+
+  // pupil line (auto-scaled 2..8 mm range)
+  const pMin = 2, pMax = 8;
+  cctx.lineWidth = 2; cctx.strokeStyle = "#38bdf8"; cctx.beginPath();
+  seriesPupil.forEach((v, i) => {
+    const x = (i / (SERIES_MAX - 1)) * W;
+    const y = H - ((v - pMin) / (pMax - pMin)) * H;
+    i ? cctx.lineTo(x, y) : cctx.moveTo(x, y);
+  });
+  cctx.stroke();
+
+  // ambient light line (0..1)
+  cctx.lineWidth = 2; cctx.strokeStyle = "#fcd34d"; cctx.beginPath();
+  seriesLight.forEach((v, i) => {
+    const x = (i / (SERIES_MAX - 1)) * W;
+    const y = H - v * H;
+    i ? cctx.lineTo(x, y) : cctx.moveTo(x, y);
+  });
+  cctx.stroke();
+}
+
+function updateLightResponse(avgPupilMm, light, goodReading) {
+  if (ambVal) ambVal.textContent = Math.round(light * 100) + "%";
+  if (ambBar) ambBar.style.width = Math.round(light * 100) + "%";
+
+  if (goodReading) {
+    if (pupilBaseline === null) pupilBaseline = avgPupilMm;
+    seriesPupil.push(avgPupilMm);
+    seriesLight.push(light);
+    if (seriesPupil.length > SERIES_MAX) seriesPupil.shift();
+    if (seriesLight.length > SERIES_MAX) seriesLight.shift();
+
+    pupNowEl.textContent = avgPupilMm.toFixed(2) + " mm";
+    pupBaseEl.textContent = pupilBaseline.toFixed(2) + " mm";
+    const delta = avgPupilMm - pupilBaseline;
+    const arrow = delta > 0.1 ? "▲ dilating" : delta < -0.1 ? "▼ constricting" : "steady";
+    pupDelEl.textContent = (delta >= 0 ? "+" : "") + delta.toFixed(2);
+    pupDelEl.className = "text-lg font-bold " +
+      (delta > 0.1 ? "text-amber-300" : delta < -0.1 ? "text-brand" : "text-slate-200");
+    pupDelEl.title = arrow;
+    drawLightChart();
+  }
+}
+
+if (resetBaseBtn) resetBaseBtn.addEventListener("click", () => {
+  pupilBaseline = null; seriesPupil.length = 0; seriesLight.length = 0;
+  drawLightChart();
+});
 
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -186,6 +272,11 @@ function onResults(results) {
   const sizeOk = irisFrac >= GOOD_IRIS_FRAC[0] && irisFrac <= GOOD_IRIS_FRAC[1];
   const centerOk = faceCentered(lms, w, h);
 
+  // Pupil light-response: ambient brightness + pupil size trend
+  const light = ambientLight(results.image, w, h);
+  const avgPupil = (m.left_pupil_diameter + m.right_pupil_diameter) / 2;
+  updateLightResponse(avgPupil, light, sizeOk && centerOk);
+
   // stability check on IPD
   ipdHistory.push(data.centers.ipdMm);
   if (ipdHistory.length > STABLE_FRAMES) ipdHistory.shift();
@@ -270,13 +361,62 @@ function addUnlock() {
 }
 
 // ----- camera bootstrap -----
-let faceMesh, camera, started = false;
+let faceMesh, started = false, rafId = null;
+
+function fail(msg) {
+  started = false;
+  startBtn.disabled = false;
+  startBtn.textContent = "Start camera";
+  setStatus(msg, false);
+}
+
 startBtn.addEventListener("click", async () => {
   if (started) return;
   started = true;
   startBtn.disabled = true;
   startBtn.textContent = "Starting…";
+  setStatus("Starting camera…", false);
 
+  // 1) Secure-context / API check (camera needs HTTPS or localhost)
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    return fail("Camera not available — needs HTTPS (the https:// site or localhost).");
+  }
+  // 2) Detection library must have loaded from the CDN
+  if (typeof FaceMesh === "undefined") {
+    return fail("Detection library didn't load — check your connection and refresh.");
+  }
+
+  // 3) Request the camera (front camera on phones)
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    });
+  } catch (e) {
+    const n = e && e.name;
+    if (n === "NotAllowedError" || n === "SecurityError")
+      return fail("Camera permission blocked — allow it in the browser, then press Start again.");
+    if (n === "NotFoundError" || n === "OverconstrainedError")
+      return fail("No camera found on this device.");
+    if (n === "NotReadableError")
+      return fail("Camera is in use by another app (Zoom/FaceTime). Close it and retry.");
+    return fail("Could not start camera: " + (n || e));
+  }
+
+  video.srcObject = stream;
+  try { await video.play(); } catch (_) { /* iOS sometimes needs the metadata event */ }
+  await new Promise(res => {
+    if (video.readyState >= 2) return res();
+    video.onloadedmetadata = () => res();
+  });
+
+  const ph = document.getElementById("camPlaceholder");
+  if (ph) ph.style.display = "none";
+  startBtn.textContent = "Camera running";
+  setStatus("Looking for your face…", false);
+
+  // 4) Init FaceMesh and pump frames with requestAnimationFrame
   faceMesh = new FaceMesh({
     locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`,
   });
@@ -288,22 +428,15 @@ startBtn.addEventListener("click", async () => {
   });
   faceMesh.onResults(onResults);
 
-  camera = new Camera(video, {
-    onFrame: async () => { await faceMesh.send({ image: video }); },
-    width: 1280,
-    height: 720,
-  });
-  try {
-    await camera.start();
-    startBtn.textContent = "Camera running";
-    const ph = document.getElementById("camPlaceholder");
-    if (ph) ph.style.display = "none";
-    setStatus("Looking for your face…", false);
-  } catch (e) {
-    started = false;
-    startBtn.disabled = false;
-    startBtn.textContent = "Start camera";
-    setStatus("Camera access denied", false);
-    alert("Could not access the camera. Please allow camera permission and use HTTPS (or localhost).");
+  let sending = false;
+  async function pump() {
+    if (video.readyState >= 2 && !sending) {
+      sending = true;
+      try { await faceMesh.send({ image: video }); }
+      catch (e) { /* transient frame errors are fine */ }
+      sending = false;
+    }
+    rafId = requestAnimationFrame(pump);
   }
+  pump();
 });
