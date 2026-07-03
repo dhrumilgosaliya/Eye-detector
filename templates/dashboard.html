@@ -36,6 +36,29 @@
         Est. camera distance: <span id="distVal" class="text-white font-semibold">–</span>
       </div>
     </div>
+
+    <!-- Lock / Submit live right under the camera (key for mobile) -->
+    <div class="flex gap-2 mt-4">
+      <button id="lockBtn" disabled
+              class="flex-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-semibold py-3 transition disabled:opacity-40 disabled:cursor-not-allowed">
+        🔒 Lock
+      </button>
+      <button id="submitBtn" disabled
+              class="flex-1 rounded-xl bg-brand hover:bg-brand-600 text-ink-900 font-semibold py-3 transition disabled:opacity-40 disabled:cursor-not-allowed">
+        Submit &amp; save
+      </button>
+    </div>
+
+    <!-- Eye shape detection -->
+    <div class="mt-4 rounded-xl bg-ink-600/60 border border-line/60 p-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-[11px] uppercase tracking-wide text-slate-400">Detected eye shape</div>
+          <div id="eyeShape" class="text-xl font-bold text-brand">–</div>
+        </div>
+        <div id="eyeShapeAttrs" class="text-xs text-slate-400 text-right leading-relaxed"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Controls + metrics -->
@@ -61,16 +84,6 @@
         <div class="{{ card }}"><div id="m_rpup" class="{{ val }}">–</div><div class="{{ lbl }}">Right pupil (approx)</div></div>
       </div>
 
-      <div class="flex gap-2 mt-5">
-        <button id="lockBtn" disabled
-                class="flex-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-semibold py-2.5 transition disabled:opacity-40 disabled:cursor-not-allowed">
-          🔒 Lock
-        </button>
-        <button id="submitBtn" disabled
-                class="flex-1 rounded-xl bg-brand hover:bg-brand-600 text-ink-900 font-semibold py-2.5 transition disabled:opacity-40 disabled:cursor-not-allowed">
-          Submit &amp; save
-        </button>
-      </div>
     </div>
 
     <!-- Pupil light-response -->
@@ -95,6 +108,19 @@
         <div class="{{ c }}"><div id="pupBase" class="text-lg font-bold text-slate-200">–</div><div class="text-[10px] uppercase tracking-wide text-slate-400">Baseline</div></div>
         <div class="{{ c }}"><div id="pupDelta" class="text-lg font-bold text-slate-200">–</div><div class="text-[10px] uppercase tracking-wide text-slate-400">Change</div></div>
       </div>
+
+      {% if prange %}
+      <div id="ageNorm" data-low="{{ prange[0] }}" data-high="{{ prange[1] }}"
+           class="mt-3 rounded-xl bg-ink-600/50 border border-line/60 px-3 py-2 text-xs">
+        <span class="text-slate-400">Typical for age {{ age }}:</span>
+        <span class="text-slate-200 font-semibold">{{ prange[0] }}–{{ prange[1] }} mm</span>
+        <span id="normStatus" class="ml-1 text-slate-400">· measuring…</span>
+      </div>
+      {% else %}
+      <div class="mt-3 text-xs text-slate-500">Add your date of birth in
+        <a href="{{ url_for('profile') }}" class="text-brand hover:underline">My Profile</a>
+        to see age-based pupil norms.</div>
+      {% endif %}
 
       <canvas id="lightChart" height="90" class="w-full mt-3 rounded-lg bg-ink-900/60"></canvas>
       <div class="flex gap-4 mt-2 text-[11px] text-slate-400">

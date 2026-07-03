@@ -4,11 +4,44 @@
 <h1 class="text-2xl font-extrabold text-white mb-1">Admin dashboard</h1>
 <p class="text-slate-400 text-sm mb-6">All users and their measurement records.</p>
 
-<div class="grid sm:grid-cols-3 gap-4 mb-8">
+<div class="grid sm:grid-cols-4 gap-4 mb-8">
   {% set stat='rounded-2xl border border-line/70 bg-ink-800/70 p-5 shadow-card' %}
-  <div class="{{ stat }}"><div class="text-3xl font-extrabold text-brand">{{ users|length }}</div><div class="text-xs uppercase tracking-wide text-slate-400 mt-1">Total users</div></div>
-  <div class="{{ stat }}"><div class="text-3xl font-extrabold text-brand">{{ total_measurements }}</div><div class="text-xs uppercase tracking-wide text-slate-400 mt-1">Total measurements</div></div>
-  <div class="{{ stat }}"><div class="text-3xl font-extrabold text-emerald-400">{{ users|selectattr('is_admin')|list|length }}</div><div class="text-xs uppercase tracking-wide text-slate-400 mt-1">Admins</div></div>
+  <div class="{{ stat }}"><div class="text-3xl font-extrabold text-brand">{{ people_count }}</div><div class="text-xs uppercase tracking-wide text-slate-400 mt-1">Users</div></div>
+  <div class="{{ stat }}"><div class="text-3xl font-extrabold text-brand">{{ total_measurements }}</div><div class="text-xs uppercase tracking-wide text-slate-400 mt-1">Measurements</div></div>
+  <div class="{{ stat }}"><div class="text-3xl font-extrabold text-emerald-400">{{ consented }}</div><div class="text-xs uppercase tracking-wide text-slate-400 mt-1">Consented</div></div>
+  <div class="{{ stat }}"><div class="text-3xl font-extrabold text-slate-200">{{ users|selectattr('is_admin')|list|length }}</div><div class="text-xs uppercase tracking-wide text-slate-400 mt-1">Admins</div></div>
+</div>
+
+<!-- Demographic analytics -->
+<div class="grid md:grid-cols-2 gap-5 mb-8">
+  {% macro bars(title, data) %}
+  <div class="rounded-2xl border border-line/70 bg-ink-800/70 p-5 shadow-card">
+    <h2 class="font-bold text-white mb-3">{{ title }}</h2>
+    {% set total = (data | sum(attribute=1)) or 1 %}
+    {% if data %}
+      <div class="space-y-2">
+      {% for label, count in data %}
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">{{ label }}</span>
+            <span class="text-slate-400">{{ count }} · {{ (100*count/total)|round(0,'floor')|int }}%</span>
+          </div>
+          <div class="h-2 rounded-full bg-ink-600 overflow-hidden">
+            <div class="h-full bg-brand" style="width: {{ (100*count/total)|round(1) }}%"></div>
+          </div>
+        </div>
+      {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-sm text-slate-500">No data yet.</p>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {{ bars("By age group", demographics.age_group) }}
+  {{ bars("By gender", demographics.gender) }}
+  {{ bars("By ethnicity", demographics.ethnicity) }}
+  {{ bars("By country", demographics.country) }}
 </div>
 
 <div class="space-y-5">
@@ -24,7 +57,13 @@
             {{ u.name }}
             {% if u.is_admin %}<span class="text-[10px] uppercase tracking-wide bg-emerald-500/15 text-emerald-300 px-2 py-0.5 rounded-full">Admin</span>{% endif %}
           </div>
-          <div class="text-xs text-slate-400">{{ u.email }} · DOB {{ u.dob or '—' }} · joined {{ u.created_at.strftime('%Y-%m-%d') }}</div>
+          <div class="text-xs text-slate-400">
+            {{ u.email }} · age {{ u.age if u.age is not none else '—' }} · joined {{ u.created_at.strftime('%Y-%m-%d') }}
+            {% if u.consent_demographics %}
+              <span class="text-slate-500">·</span>
+              {{ u.gender or '—' }}, {{ u.ethnicity or '—' }}{% if u.country %}, {{ u.country }}{% endif %}
+            {% endif %}
+          </div>
         </div>
       </div>
       <span class="text-xs text-slate-400">{{ u.measurements|length }} record(s)</span>

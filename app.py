@@ -12,12 +12,13 @@ browser uses as a scale reference. All detection runs client-side (MediaPipe
 FaceMesh); this backend handles accounts, storage and the admin view.
 """
 import os
-from datetime import datetime
+from datetime import datetime, date
 from functools import wraps
 
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, jsonify, abort)
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -32,6 +33,49 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
+# Allowed demographic choices (kept simple + inclusive)
+GENDER_CHOICES = ["", "Female", "Male", "Non-binary", "Prefer not to say"]
+ETHNICITY_CHOICES = ["", "Asian", "Black", "Hispanic/Latino",
+                     "Middle Eastern", "White", "Mixed", "Other",
+                     "Prefer not to say"]
+
+
+# --------------------------------------------------------------------------- #
+# Demographic helpers
+# --------------------------------------------------------------------------- #
+def calc_age(dob):
+    """Age in years from a 'YYYY-MM-DD' string, or None."""
+    try:
+        d = datetime.strptime(dob, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+    t = date.today()
+    return t.year - d.year - ((t.month, t.day) < (d.month, d.day))
+
+
+def expected_pupil_range(age):
+    """Approximate typical resting pupil diameter (mm) in average room light,
+    by age band. Indicative only — from general clinical literature."""
+    if age is None:
+        return None
+    bands = [(12, (4.0, 6.5)), (19, (3.8, 6.0)), (29, (3.5, 5.5)),
+             (39, (3.3, 5.2)), (49, (3.0, 5.0)), (59, (2.8, 4.6)),
+             (69, (2.6, 4.2)), (200, (2.4, 4.0))]
+    for max_age, rng in bands:
+        if age <= max_age:
+            return rng
+    return (2.4, 4.0)
+
+
+def age_group(age):
+    if age is None:
+        return "Unknown"
+    for lo, hi in [(0, 12), (13, 19), (20, 29), (30, 39),
+                   (40, 49), (50, 59), (60, 69)]:
+        if age <= hi:
+            return f"{lo}-{hi}"
+    return "70+"
+
 
 # --------------------------------------------------------------------------- #
 # Models
@@ -44,6 +88,16 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # optional demographic fields (stored only with consent)
+    gender = db.Column(db.String(30))
+    ethnicity = db.Column(db.String(60))
+    country = db.Column(db.String(60))
+    consent_demographics = db.Column(db.Boolean, default=False)
+
+    @property
+    def age(self):
+        return calc_age(self.dob)
 
     measurements = db.relationship("Measurement", backref="user",
                                    cascade="all, delete-orphan", lazy=True)
@@ -145,6 +199,14 @@ def signup():
 
         user = User(name=name, email=email, dob=dob)
         user.set_password(password)
+
+        # demographics stored only if the user consents
+        if request.form.get("consent"):
+            user.consent_demographics = True
+            user.gender = request.form.get("gender", "").strip()
+            user.ethnicity = request.form.get("ethnicity", "").strip()
+            user.country = request.form.get("country", "").strip()
+
         db.session.add(user)
         db.session.commit()
 
@@ -152,7 +214,8 @@ def signup():
         session["is_admin"] = user.is_admin
         flash("Profile created. Welcome!", "success")
         return redirect(url_for("dashboard"))
-    return render_template("signup.html")
+    return render_template("signup.html", genders=GENDER_CHOICES,
+                           ethnicities=ETHNICITY_CHOICES)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -182,7 +245,10 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    return render_template("dashboard.html")
+    user = current_user()
+    age = user.age
+    prange = expected_pupil_range(age)
+    return render_template("dashboard.html", age=age, prange=prange)
 
 
 @app.route("/api/measurements", methods=["POST"])
@@ -242,27 +308,82 @@ def profile():
         new_pw = request.form.get("password", "")
         if new_pw:
             user.set_password(new_pw)
+
+        # demographics
+        if request.form.get("consent"):
+            user.consent_demographics = True
+            user.gender = request.form.get("gender", "").strip()
+            user.ethnicity = request.form.get("ethnicity", "").strip()
+            user.country = request.form.get("country", "").strip()
+        else:
+            # consent withdrawn -> clear stored demographics
+            user.consent_demographics = False
+            user.gender = user.ethnicity = user.country = None
+
         db.session.commit()
         flash("Profile updated.", "success")
         return redirect(url_for("profile"))
-    return render_template("profile.html", user=user)
+    return render_template("profile.html", user=user, genders=GENDER_CHOICES,
+                           ethnicities=ETHNICITY_CHOICES)
 
 
 # --------------------------------------------------------------------------- #
 # Routes - admin
 # --------------------------------------------------------------------------- #
+def _tally(pairs):
+    """Count occurrences, return list of (label, count) sorted desc."""
+    counts = {}
+    for p in pairs:
+        key = p if p else "Not specified"
+        counts[key] = counts.get(key, 0) + 1
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
 @app.route("/admin")
 @admin_required
 def admin():
     users = User.query.order_by(User.created_at.desc()).all()
+    people = [u for u in users if not u.is_admin]  # exclude admin from stats
     total_measurements = Measurement.query.count()
+
+    demographics = {
+        "gender": _tally(u.gender for u in people),
+        "ethnicity": _tally(u.ethnicity for u in people),
+        "country": _tally(u.country for u in people),
+        "age_group": _tally(age_group(u.age) for u in people),
+    }
+    consented = sum(1 for u in people if u.consent_demographics)
+
     return render_template("admin.html", users=users,
-                           total_measurements=total_measurements)
+                           total_measurements=total_measurements,
+                           demographics=demographics,
+                           people_count=len(people),
+                           consented=consented)
 
 
 # --------------------------------------------------------------------------- #
 # DB init + seed
 # --------------------------------------------------------------------------- #
+def ensure_columns():
+    """Add any demographic columns missing from an existing 'user' table.
+    Lets older databases upgrade in place without a manual migration.
+    Works on SQLite and PostgreSQL."""
+    insp = inspect(db.engine)
+    if "user" not in insp.get_table_names():
+        return
+    existing = {c["name"] for c in insp.get_columns("user")}
+    wanted = {
+        "gender": "VARCHAR(30)",
+        "ethnicity": "VARCHAR(60)",
+        "country": "VARCHAR(60)",
+        "consent_demographics": "BOOLEAN",
+    }
+    for col, ddl in wanted.items():
+        if col not in existing:
+            db.session.execute(text(f'ALTER TABLE "user" ADD COLUMN {col} {ddl}'))
+    db.session.commit()
+
+
 def seed():
     """Create tables and ensure a single admin account exists.
 
@@ -273,6 +394,7 @@ def seed():
     Every other user signs up themselves. There is no demo/sample account.
     """
     db.create_all()
+    ensure_columns()
 
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@eyedetector.app").strip().lower()
     admin_pw = os.environ.get("ADMIN_PASSWORD", "change-me-admin")

@@ -29,6 +29,34 @@
           <label for="password" class="{{ lbl }}">Password</label>
           <input type="password" id="password" name="password" required class="{{ inp }}">
         </div>
+
+        <div class="pt-2 border-t border-line/60">
+          <p class="text-sm font-semibold text-slate-300 mt-3">Demographics <span class="text-slate-500 font-normal">(optional)</span></p>
+          <p class="text-xs text-slate-500 mb-2">Helps compare your readings to typical ranges. Only saved if you tick consent.</p>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="gender" class="{{ lbl }}">Gender</label>
+              <select id="gender" name="gender" class="{{ inp }}">
+                {% for g in genders %}<option value="{{ g }}">{{ g or '—' }}</option>{% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="ethnicity" class="{{ lbl }}">Ethnicity</label>
+              <select id="ethnicity" name="ethnicity" class="{{ inp }}">
+                {% for e in ethnicities %}<option value="{{ e }}">{{ e or '—' }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mt-3">
+            <label for="country" class="{{ lbl }}">Country</label>
+            <input type="text" id="country" name="country" placeholder="e.g. Canada" class="{{ inp }}">
+          </div>
+          <label class="flex items-start gap-2 mt-3 text-xs text-slate-400">
+            <input type="checkbox" name="consent" value="1" class="mt-0.5 accent-sky-400">
+            <span>I consent to storing my demographic details for age/group comparisons and aggregate analytics. I can withdraw this anytime in My Profile.</span>
+          </label>
+        </div>
+
         <button type="submit"
                 class="w-full rounded-xl bg-brand hover:bg-brand-600 text-ink-900 font-semibold py-3 transition">
           Create profile

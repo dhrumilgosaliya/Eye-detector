@@ -13,6 +13,12 @@ const STABLE_TOL_MM = 3.0;            // max IPD variation (mm) to count as stea
 const L_CENTER = 468, L_RING = [469, 470, 471, 472];
 const R_CENTER = 473, R_RING = [474, 475, 476, 477];
 
+// Eyelid corner/lid landmarks for shape analysis
+// Right eye (image-left): outer 33, inner 133, top 159, bottom 145
+// Left  eye (image-right): inner 362, outer 263, top 386, bottom 374
+const REYE = { outer: 33,  inner: 133, top: 159, bottom: 145 };
+const LEYE = { outer: 263, inner: 362, top: 386, bottom: 374 };
+
 const video = document.getElementById("video");
 const overlay = document.getElementById("overlay");
 const octx = overlay.getContext("2d");
@@ -46,6 +52,20 @@ let pupilBaseline = null;          // mm, set on first good reading
 const seriesPupil = [];            // recent pupil mm
 const seriesLight = [];            // recent ambient light 0..1
 const SERIES_MAX = 160;
+
+// eye-shape detection UI + smoothing buffers
+const eyeShapeEl = document.getElementById("eyeShape");
+const eyeShapeAttrsEl = document.getElementById("eyeShapeAttrs");
+const shapeBuf = { aspect: [], tilt: [], spacing: [] };
+const SHAPE_SMOOTH = 15;
+let frozenShape = null;
+
+// age-based pupil norm (injected by the dashboard template)
+const ageNormEl = document.getElementById("ageNorm");
+const normStatusEl = document.getElementById("normStatus");
+const NORM = ageNormEl
+  ? { low: parseFloat(ageNormEl.dataset.low), high: parseFloat(ageNormEl.dataset.high) }
+  : null;
 
 let ipdHistory = [];
 let steadyCount = 0;
@@ -110,12 +130,23 @@ function updateLightResponse(avgPupilMm, light, goodReading) {
     pupDelEl.className = "text-lg font-bold " +
       (delta > 0.1 ? "text-amber-300" : delta < -0.1 ? "text-brand" : "text-slate-200");
     pupDelEl.title = arrow;
+
+    // compare against typical range for the user's age
+    if (NORM && normStatusEl) {
+      let txt, cls;
+      if (avgPupilMm < NORM.low)      { txt = "· below typical"; cls = "ml-1 text-brand"; }
+      else if (avgPupilMm > NORM.high){ txt = "· above typical"; cls = "ml-1 text-amber-300"; }
+      else                            { txt = "· within typical range ✓"; cls = "ml-1 text-emerald-400"; }
+      normStatusEl.textContent = txt;
+      normStatusEl.className = cls;
+    }
     drawLightChart();
   }
 }
 
 if (resetBaseBtn) resetBaseBtn.addEventListener("click", () => {
   pupilBaseline = null; seriesPupil.length = 0; seriesLight.length = 0;
+  if (normStatusEl) { normStatusEl.textContent = "· measuring…"; normStatusEl.className = "ml-1 text-slate-400"; }
   drawLightChart();
 });
 
@@ -237,6 +268,72 @@ function renderMetrics(m) {
   document.getElementById("m_rpup").textContent = m.right_pupil_diameter + " mm";
 }
 
+// ---- Eye-shape detection ----------------------------------------------- //
+// Uses eyelid geometry: opening aspect ratio, canthal tilt, and eye spacing.
+// Averaging the two eyes' tilt cancels head roll. This is a geometric
+// estimate, not a clinical classification.
+function median(arr) {
+  const a = [...arr].sort((x, y) => x - y);
+  return a[Math.floor(a.length / 2)];
+}
+
+function eyeGeom(lms, e, w, h) {
+  const P = i => ({ x: lms[i].x * w, y: lms[i].y * h });
+  const outer = P(e.outer), inner = P(e.inner), top = P(e.top), bot = P(e.bottom);
+  const width = dist(outer, inner);
+  const height = dist(top, bot);
+  // signed vertical rise from inner->outer corner (positive = outer higher on screen)
+  const rise = (inner.y - outer.y) / (width || 1);
+  return { width, height, aspect: height / (width || 1), rise, inner };
+}
+
+function analyzeEyeShape(lms, w, h) {
+  const r = eyeGeom(lms, REYE, w, h);
+  const l = eyeGeom(lms, LEYE, w, h);
+
+  const aspect = (r.aspect + l.aspect) / 2;
+  const tilt = (r.rise + l.rise) / 2;               // roll-cancelled canthal tilt
+  const eyeW = (r.width + l.width) / 2;
+  const interInner = dist(r.inner, l.inner);
+  const spacing = interInner / (eyeW || 1);          // ~1 = average spacing
+
+  shapeBuf.aspect.push(aspect); shapeBuf.tilt.push(tilt); shapeBuf.spacing.push(spacing);
+  for (const k of ["aspect", "tilt", "spacing"])
+    if (shapeBuf[k].length > SHAPE_SMOOTH) shapeBuf[k].shift();
+
+  const A = median(shapeBuf.aspect), T = median(shapeBuf.tilt), S = median(shapeBuf.spacing);
+
+  // primary shape from opening aspect ratio
+  let primary;
+  if (A >= 0.42) primary = "Round";
+  else if (A >= 0.30) primary = "Almond";
+  else primary = "Narrow / almond";
+
+  // canthal tilt
+  let tiltLabel;
+  if (T > 0.06) tiltLabel = "Upturned";
+  else if (T < -0.06) tiltLabel = "Downturned";
+  else tiltLabel = "Neutral tilt";
+
+  // spacing
+  let spaceLabel;
+  if (S > 1.12) spaceLabel = "Wide-set";
+  else if (S < 0.90) spaceLabel = "Close-set";
+  else spaceLabel = "Average-set";
+
+  return {
+    label: primary,
+    attrs: [tiltLabel, spaceLabel],
+    detail: { aspect: A, tilt: T, spacing: S },
+  };
+}
+
+function renderEyeShape(s) {
+  if (!eyeShapeEl) return;
+  eyeShapeEl.textContent = s.label;
+  eyeShapeAttrsEl.innerHTML = s.attrs.join("<br>");
+}
+
 function onResults(results) {
   overlay.width = video.videoWidth;
   overlay.height = video.videoHeight;
@@ -276,6 +373,13 @@ function onResults(results) {
   const light = ambientLight(results.image, w, h);
   const avgPupil = (m.left_pupil_diameter + m.right_pupil_diameter) / 2;
   updateLightResponse(avgPupil, light, sizeOk && centerOk);
+
+  // Eye-shape detection (needs the face reasonably placed for stable geometry)
+  if (sizeOk && centerOk) {
+    const shape = analyzeEyeShape(lms, w, h);
+    frozenShape = shape;
+    renderEyeShape(shape);
+  }
 
   // stability check on IPD
   ipdHistory.push(data.centers.ipdMm);

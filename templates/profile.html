@@ -25,6 +25,33 @@
         <label for="password" class="{{ lbl }}">New password</label>
         <input type="password" id="password" name="password" placeholder="••••••••" class="{{ inp }}">
       </div>
+
+      <div class="pt-2 border-t border-line/60">
+        <p class="text-sm font-semibold text-slate-300 mt-3">Demographics <span class="text-slate-500 font-normal">(optional)</span></p>
+        <div class="grid grid-cols-2 gap-3 mt-2">
+          <div>
+            <label for="gender" class="{{ lbl }}">Gender</label>
+            <select id="gender" name="gender" class="{{ inp }}">
+              {% for g in genders %}<option value="{{ g }}" {{ 'selected' if user.gender==g else '' }}>{{ g or '—' }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="ethnicity" class="{{ lbl }}">Ethnicity</label>
+            <select id="ethnicity" name="ethnicity" class="{{ inp }}">
+              {% for e in ethnicities %}<option value="{{ e }}" {{ 'selected' if user.ethnicity==e else '' }}>{{ e or '—' }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label for="country" class="{{ lbl }}">Country</label>
+          <input type="text" id="country" name="country" value="{{ user.country or '' }}" placeholder="e.g. Canada" class="{{ inp }}">
+        </div>
+        <label class="flex items-start gap-2 mt-3 text-xs text-slate-400">
+          <input type="checkbox" name="consent" value="1" class="mt-0.5 accent-sky-400" {{ 'checked' if user.consent_demographics else '' }}>
+          <span>Store my demographic details for comparisons and aggregate analytics. Unticking this removes them.</span>
+        </label>
+      </div>
+
       <button type="submit" class="rounded-xl bg-brand hover:bg-brand-600 text-ink-900 font-semibold px-5 py-2.5 transition">
         Save changes
       </button>
